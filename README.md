@@ -69,7 +69,7 @@ def simular_T_final(flujo_loop):  # Define una función para simular la temperat
 
 bajo = 1  # Inicializa el límite inferior de la búsqueda binaria en 1.
 
-alto = 1000000  # Inicializa el límite superior de la búsqueda binaria en 10000 (un valor alto arbitrario).
+alto = 20000  # Inicializa el límite superior de la búsqueda binaria en 10000 (un valor alto arbitrario).
 
 while bajo < alto:  # Continúa el bucle mientras el límite inferior sea menor que el superior.
     medio = (bajo + alto) // 2  # Calcula el punto medio entero entre bajo y alto.
@@ -150,6 +150,7 @@ def calcular_Q_campo_horario(DNI_vec, Tamb_vec):
 
         Q_campo[h] = (Q_loop_h * N) / 1e6  # convierte a MW térmicos
     return Q_campo
+
 
 # === CÁLCULO DEL CAMPO SOLAR HORARIO ===
 Q_campo_horario = calcular_Q_campo_horario(DNI_horario, T_ambiente_horaria)
@@ -257,7 +258,82 @@ plt.show()
 print(f"Capacidad TES (8h): {cap8:.2f} MWh térmicos")
 print(f"Capacidad TES (18h): {cap18:.2f} MWh térmicos")
 
+# ======================================================================
+# 3.3.1 INVENTARIO TES (8h y 18h) con SM = 2  → ESTE ES EL BUENO
+# ======================================================================
+print("\n" + "="*70)
+print("3.3.1 INVENTARIO TES (8h y 18h) - CON MÚLTIPLO SOLAR SM = 2")
+print("="*70)
 
+# Campo solar escalado a SM = 2
+SM_para_TES = 2.0
+Q_campo_SM2 = Q_campo_horario * SM_para_TES   # Esto es lo ÚNICO que cambia
+
+# Buscamos el día con MÁXIMO EXCEDENTE TÉRMICO (no solo DNI)
+excedente_diario = []
+for d in range(365):
+    inicio = d * 24
+    fin = inicio + 24
+    Q_dia = Q_campo_SM2[inicio:fin]
+    excedente = np.sum(np.maximum(Q_dia - calor_PC, 0))  # MWh térmicos sobrantes
+    excedente_diario.append(excedente)
+
+dia_mejor = np.argmax(excedente_diario)
+print(f"Día con mayor excedente térmico (SM=2): {dia_mejor + 1}")
+print(f"Excedente térmico ese día: {excedente_diario[dia_mejor]:.1f} MWh térmicos")
+
+# Extraemos el día seleccionado
+inicio = dia_mejor * 24
+Q_dia = Q_campo_SM2[inicio:inicio+24]
+excedente_h = np.maximum(Q_dia - calor_PC, 0)
+deficit_h   = np.maximum(calor_PC - Q_dia, 0)
+
+# Función inventario TES
+def inventario_TES(cap_horas):
+    cap_MWh_termicos = cap_horas * calor_PC
+    inventario = [0.0]
+    for h in range(24):
+        energia = inventario[-1] + excedente_h[h] - deficit_h[h]
+        energia = max(0, min(energia, cap_MWh_termicos))
+        inventario.append(energia)
+    return np.array(inventario[1:]), cap_MWh_termicos
+
+TES_8h,  cap_8h  = inventario_TES(8)
+TES_18h, cap_18h = inventario_TES(18)
+
+# ======================================================================
+# GRÁFICO COMPARATIVO sublime siu
+# ======================================================================
+horas = np.arange(24)
+
+plt.figure(figsize=(13, 7))
+plt.plot(horas, TES_8h,  label='TES 8 horas (se satura y derrama)',  color='steelblue', linewidth=3.5)
+plt.plot(horas, TES_18h, label='TES 18 horas (óptimo, casi lleno)', color='darkorange', linewidth=3.5)
+
+# Líneas de capacidad nominal
+plt.axhline(y=cap_8h,  color='steelblue',  linestyle='--', alpha=0.7, linewidth=2, label=f'Capacidad 8h = {cap_8h:.0f} MWh')
+plt.axhline(y=cap_18h, color='darkorange', linestyle='--', alpha=0.7, linewidth=2, label=f'Capacidad 18h = {cap_18h:.0f} MWh')
+
+# Relleno para mejor visualización
+plt.fill_between(horas, TES_8h,  alpha=0.25, color='steelblue')
+plt.fill_between(horas, TES_18h, alpha=0.25, color='darkorange')
+
+plt.title(f'3.3.1 Inventario de Energía TES (SM = 2) – Día con mayor excedente (día {dia_mejor+1})', 
+          fontsize=16, fontweight='bold', pad=20)
+plt.xlabel('Hora del día', fontsize=14)
+plt.ylabel('Energía almacenada [MWh térmicos]', fontsize=14)
+plt.legend(fontsize=12, loc='upper left')
+plt.grid(True, alpha=0.3)
+plt.xlim(0, 23)
+plt.ylim(0, cap_18h * 1.1)
+plt.tight_layout()
+plt.savefig('3.3.1_Inventario_TES_SM2_COMPARATIVO.png', dpi=300, bbox_inches='tight')
+plt.show()
+
+print(f"Capacidad TES 8h:  {cap_8h:.0f} MWh térmicos")
+print(f"Capacidad TES 18h: {cap_18h:.0f} MWh térmicos")
+print(f"Máximo alcanzado (8h):  {TES_8h.max():.1f} MWh → se llena al {(TES_8h.max()/cap_8h)*100:.1f}%")
+print(f"Máximo alcanzado (18h): {TES_18h.max():.1f} MWh → se llena al {(TES_18h.max()/cap_18h)*100:.1f}%")
 # === 3.4.1 Despacho con TES (8 h y 18 h) ===
 
 # ============================
