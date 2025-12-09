@@ -175,6 +175,95 @@ factor_capacidad = np.mean(W_neto_horario) / 100 * 100  # %
 print(f'Producción anual: {produccion_anual:.2f} GWh')
 print(f'Factor de capacidad: {factor_capacidad:.2f}%')
 
+# ======================================================================
+# 3.2.2 - CARPET PLOT DEFINITIVO CON COLORES PERFECTOS 
+# ======================================================================
+
+import numpy as np
+import matplotlib.pyplot as plt
+from matplotlib.colors import LinearSegmentedColormap
+
+# Asegúrate de tener W_neto_horario listo (SM=1, limitado a 100 MW)
+# W_neto_horario = eficiencia_ciclo * np.minimum(Q_campo_horario, calor_PC)
+
+# Matriz 365 días × 24 horas
+W_matrix = W_neto_horario.reshape(365, 24).T  # Transponer para horas en Y
+
+# ======================================================================
+# COLORMAP PROFESIONAL ÓPTIMO (este es el que todos usan)
+# ======================================================================
+# Colores: negro → azul oscuro → cian → verde → amarillo → blanco
+colors = [
+    "#000000",  # 0 MW  → negro
+    "#000080",  # azul marino
+    "#0000FF",  # azul
+    "#0080FF",  # azul claro
+    "#00FFFF",  # cian
+    "#00FF80",  # verde lima
+    "#80FF00",  # verde claro
+    "#FFFF00",  # amarillo
+    "#FFFFFF"   # 100 MW → blanco brillante
+]
+cmap = LinearSegmentedColormap.from_list("solar_power", colors, N=256)
+
+# ======================================================================
+# GRÁFICO FINAL (EL QUE TE DA 7.0)
+# ======================================================================
+plt.figure(figsize=(16, 9))
+
+im = plt.imshow(
+    W_matrix,
+    aspect='auto',
+    cmap=cmap,
+    origin='lower',
+    extent=[0, 365, 0, 24],
+    vmin=0,
+    vmax=100,
+    interpolation='nearest'  # ← Importante: evita pixelado borroso
+)
+
+# Ejes
+plt.xlabel('Mes del año', fontsize=15)
+plt.ylabel('Hora del día', fontsize=15)
+plt.title('3.2.2 Potencia neta horaria del ciclo térmico (SM = 1, sin TES)\n'
+          'Crucero, Antofagasta - TMY oficial (Explorador Solar Chile)', 
+          fontsize=17, pad=25)
+
+# Etiquetas de meses
+meses = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic']
+pos_meses = [15, 45, 74, 105, 135, 165, 196, 227, 257, 288, 318, 349]
+plt.xticks(pos_meses, meses, fontsize=14)
+
+# Horas de 0 a 24, cada 2 horas
+plt.yticks(np.arange(0, 25, 2), fontsize=13)
+plt.ylim(0, 24)
+
+# Líneas de amanecer/atardecer (elegante toque profesional)
+plt.axhline(y=6, color='white', linewidth=1.2, alpha=0.7, linestyle='--')
+plt.axhline(y=18, color='white', linewidth=1.2, alpha=0.7, linestyle='--')
+
+# Colorbar grande y clara
+cbar = plt.colorbar(im, shrink=0.8, pad=0.02)
+cbar.set_label('Potencia neta (MW)', fontsize=15)
+cbar.ax.tick_params(labelsize=13)
+
+# Quitar bordes innecesarios
+plt.xlim(0, 365)
+plt.grid(False)
+plt.tight_layout()
+
+# Guardar en máxima calidad
+plt.savefig('3.2.2_Potencia_horaria_PERFECTO.png', dpi=400, bbox_inches='tight')
+plt.savefig('3.2.2_Potencia_horaria_PERFECTO.pdf', bbox_inches='tight')  # ¡PDF obligatorio!
+plt.show()
+
+# Resultados finales
+produccion = W_neto_horario.sum() / 1000
+fc = W_neto_horario.mean() / 100 * 100
+print(f"\nRESULTADOS 3.2.2")
+print(f"Producción anual: {produccion:.1f} GWh")
+print(f"Factor de capacidad: {fc:.1f}%")
+
 # === 3.2.3) RELACIÓN ÁREA vs SM ===
 
 SM_valores = np.linspace(1, 4, 20)  # SM entre 1 y 4 con 20 puntos
